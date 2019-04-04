@@ -40,6 +40,7 @@ const (
 	envSamplerMaxOperations   = "JAEGER_SAMPLER_MAX_OPERATIONS"
 	envSamplerRefreshInterval = "JAEGER_SAMPLER_REFRESH_INTERVAL"
 	envReporterMaxQueueSize   = "JAEGER_REPORTER_MAX_QUEUE_SIZE"
+	envReporterMaxBatchSize   = "JAEGER_REPORTER_MAX_BATCH_SIZE"
 	envReporterFlushInterval  = "JAEGER_REPORTER_FLUSH_INTERVAL"
 	envReporterLogSpans       = "JAEGER_REPORTER_LOG_SPANS"
 	envEndpoint               = "JAEGER_ENDPOINT"
@@ -134,6 +135,14 @@ func samplerConfigFromEnv() (*SamplerConfig, error) {
 // reporterConfigFromEnv creates a new ReporterConfig based on the environment variables
 func reporterConfigFromEnv() (*ReporterConfig, error) {
 	rc := &ReporterConfig{}
+
+	if e := os.Getenv(envReporterMaxBatchSize); e != "" {
+		if value, err := strconv.ParseInt(e, 10, 0); err == nil {
+			rc.BatchSize = int(value)
+		} else {
+			return nil, errors.Wrapf(err, "cannot parse env var %s=%s", envReporterMaxBatchSize, e)
+		}
+	}
 
 	if e := os.Getenv(envReporterMaxQueueSize); e != "" {
 		if value, err := strconv.ParseInt(e, 10, 0); err == nil {
