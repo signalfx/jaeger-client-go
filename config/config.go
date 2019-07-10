@@ -28,7 +28,7 @@ import (
 	throttler "github.com/uber/jaeger-client-go/internal/throttler/remote"
 	"github.com/uber/jaeger-client-go/rpcmetrics"
 	"github.com/uber/jaeger-client-go/transport"
-	"github.com/uber/jaeger-lib/metrics"
+        "github.com/uber/jaeger-lib/metrics"
 )
 
 const defaultSamplingProbability = 0.001
@@ -90,6 +90,12 @@ type SamplerConfig struct {
 
 // ReporterConfig configures the reporter. All fields are optional.
 type ReporterConfig struct {
+	// BatchSize controls the maximum number of spans the transport will use per request. This
+	// defaults to 1 which is for backward compatibility reasons and probably insufficient for
+	// applications of any scale.
+	// Can be set by exporting an environment variable named JAEGER_REPORTER_MAX_BATCH_SIZE
+	BatchSize int `yaml:"batchSize"`
+
 	// QueueSize controls how many spans the reporter can keep in memory before it starts dropping
 	// new spans. The queue is continuously drained by a background go-routine, as fast as spans
 	// can be sent out of process.
@@ -366,6 +372,9 @@ func (rc *ReporterConfig) NewReporter(
 	metrics *jaeger.Metrics,
 	logger jaeger.Logger,
 ) (jaeger.Reporter, error) {
+	if rc.BatchSize <= 0 {
+		rc.BatchSize = 1
+	}
 	sender, err := rc.newTransport()
 	if err != nil {
 		return nil, err
@@ -386,10 +395,10 @@ func (rc *ReporterConfig) NewReporter(
 func (rc *ReporterConfig) newTransport() (jaeger.Transport, error) {
 	switch {
 	case rc.CollectorEndpoint != "" && rc.User != "" && rc.Password != "":
-		return transport.NewHTTPTransport(rc.CollectorEndpoint, transport.HTTPBatchSize(1),
+		return transport.NewHTTPTransport(rc.CollectorEndpoint, transport.HTTPBatchSize(rc.BatchSize),
 			transport.HTTPBasicAuth(rc.User, rc.Password)), nil
 	case rc.CollectorEndpoint != "":
-		return transport.NewHTTPTransport(rc.CollectorEndpoint, transport.HTTPBatchSize(1)), nil
+		return transport.NewHTTPTransport(rc.CollectorEndpoint, transport.HTTPBatchSize(rc.BatchSize)), nil
 	default:
 		return jaeger.NewUDPTransport(rc.LocalAgentHostPort, 0)
 	}
